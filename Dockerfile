@@ -1,4 +1,4 @@
-FROM node:20-slim
+FROM node:22-slim
 
 # Build tools needed for better-sqlite3 native module
 RUN apt-get update && apt-get install -y \
@@ -12,8 +12,8 @@ WORKDIR /app
 # Copy only the betika-live app folder
 COPY betika-live/package.json betika-live/package-lock.json* ./
 
-# Install production dependencies
-RUN npm install --omit=dev
+# Install production dependencies (force native rebuild for better-sqlite3)
+RUN npm install --omit=dev --build-from-source
 
 # Copy app source
 COPY betika-live/ .
