@@ -1,0 +1,4 @@
+node_modules
+matches.db
+*.db
+.env
