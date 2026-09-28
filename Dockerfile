@@ -9,16 +9,15 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# Copy package files first for layer caching
-COPY package.json package-lock.json* ./
+# Copy only the betika-live app folder
+COPY betika-live/package.json betika-live/package-lock.json* ./
 
-# Install dependencies (rebuilds native modules for this platform)
+# Install production dependencies
 RUN npm install --omit=dev
 
-# Copy the rest of the app
-COPY . .
+# Copy app source
+COPY betika-live/ .
 
-# Render injects PORT via environment variable
 ENV PORT=3000
 EXPOSE 3000
 

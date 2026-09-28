@@ -1,0 +1,13 @@
+node_modules
+betika-live/node_modules
+betika-live/matches.db
+*.db
+.env
+.git
+.vscode
+docs
+jasmine-standalone
+playgrounds
+src
+tests
+scripts
