@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pro Bets — Betika Live</title>
+  <link rel="manifest" href="/manifest.json" />
+  <meta name="theme-color" content="#f0883e" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pro Bets" />
+  <link rel="apple-touch-icon" href="/icon-192.svg" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    header {
+      background: #161b22; border-bottom: 1px solid #21262d;
+      padding: 14px 24px; display: flex; align-items: center; gap: 14px;
+      position: sticky; top: 0; z-index: 10;
+    }
+    .back-btn {
+      background: none; border: 1px solid #30363d; border-radius: 6px;
+      color: #8b949e; padding: 5px 12px; font-size: 12px; cursor: pointer;
+      text-decoration: none; display: flex; align-items: center; gap: 5px;
+    }
+    .back-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .logo { font-size: 20px; font-weight: 800; color: #f0883e; }
+    .badge { background: #f0883e18; color: #f0883e; border: 1px solid #f0883e40; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #f0883e; animation: blink 1.4s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.4} }
+    .spacer { flex: 1; }
+    .refresh-label { font-size: 12px; color: #484f58; }
+    #countdown { font-size: 12px; color: #f0883e; font-weight: 600; background: #f0883e18; border: 1px solid #f0883e30; border-radius: 4px; padding: 2px 7px; }
+
+    /* criteria strip */
+    .criteria {
+      margin: 16px 24px 0;
+      background: #161b22; border: 1px solid #21262d; border-radius: 10px;
+      padding: 12px 18px; display: flex; flex-wrap: wrap; gap: 18px;
+      font-size: 12px; color: #8b949e;
+    }
+    .criteria span { display: flex; align-items: center; gap: 6px; }
+    .criteria strong { color: #e6edf3; }
+
+    .stats { display: flex; gap: 10px; padding: 16px 24px 0; flex-wrap: wrap; }
+    .stat { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px 18px; min-width: 100px; }
+    .stat .val { font-size: 26px; font-weight: 700; }
+    .stat .val.orange { color: #f0883e; }
+    .stat .lbl { font-size: 11px; color: #8b949e; margin-top: 1px; }
+
+    .toolbar { padding: 14px 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .search-wrap input {
+      width: 100%; background: #161b22; border: 1px solid #30363d; border-radius: 6px;
+      color: #e6edf3; padding: 7px 10px 7px 32px; font-size: 13px; outline: none;
+    }
+    .search-wrap input:focus { border-color: #f0883e; }
+    .search-wrap::before { content: '🔍'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; pointer-events: none; }
+    select { background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 7px 10px; font-size: 13px; cursor: pointer; outline: none; }
+
+    .grid { padding: 0 24px 32px; display: grid; gap: 10px; }
+
+    .card {
+      background: #161b22; border: 1px solid #f0883e40;
+      border-radius: 10px; padding: 16px 18px; position: relative;
+      transition: border-color .15s;
+    }
+    .card:hover { border-color: #f0883e90; }
+    .pro-tag {
+      position: absolute; top: 14px; right: 14px;
+      background: #f0883e; color: #0d1117;
+      font-size: 10px; font-weight: 800; letter-spacing: .5px;
+      border-radius: 4px; padding: 2px 8px;
+    }
+
+    .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-right: 72px; }
+    .league-name { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
+    .min-badge { border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 700; background: #3fb95018; color: #3fb950; border: 1px solid #3fb95040; }
+    .min-badge.ht-stage { background: #f0883e18; color: #f0883e; border: 1px solid #f0883e40; }
+
+    .teams-row { display: flex; align-items: center; gap: 8px; }
+    .team { flex: 1; font-size: 15px; font-weight: 700; }
+    .team.away { text-align: right; }
+    .score-block {
+      flex-shrink: 0; background: #0d1117; border: 1px solid #f0883e60;
+      border-radius: 6px; padding: 6px 16px; font-size: 20px; font-weight: 800;
+      letter-spacing: 3px; min-width: 80px; text-align: center; color: #f0883e;
+    }
+
+    /* check pills */
+    .checks { display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap; }
+    .chk {
+      border-radius: 5px; padding: 3px 10px; font-size: 11px;
+      display: flex; align-items: center; gap: 4px;
+      border: 1px solid #3fb95040; background: #3fb95010; color: #3fb950;
+    }
+
+    .meta { display: flex; gap: 14px; margin-top: 8px; font-size: 11px; color: #484f58; flex-wrap: wrap; }
+
+    .odds-row { display: flex; gap: 6px; margin-top: 10px; }
+    .odd-btn { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 5px; padding: 5px 6px; text-align: center; }
+    .odd-btn .odd-label { display: block; font-size: 10px; color: #484f58; }
+    .odd-btn .odd-val   { display: block; font-size: 14px; font-weight: 700; color: #e6edf3; }
+
+    .state { text-align: center; padding: 64px 20px; color: #8b949e; }
+    .state .icon { font-size: 48px; display: block; margin-bottom: 12px; }
+    .state .sub { font-size: 12px; color: #484f58; margin-top: 8px; }
+    .spinner { width: 34px; height: 34px; border: 3px solid #21262d; border-top-color: #f0883e; border-radius: 50%; animation: spin .75s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .retry-btn { margin-top: 14px; background: #f0883e; color: #0d1117; border: none; border-radius: 6px; padding: 8px 18px; font-weight: 700; font-size: 13px; cursor: pointer; }
+    .foot { text-align: center; font-size: 11px; color: #484f58; padding: 12px 0 24px; }
+
+    .section-divider {
+      padding: 10px 4px 6px;
+      font-size: 11px; font-weight: 700; color: #484f58;
+      text-transform: uppercase; letter-spacing: .8px;
+      border-top: 1px solid #21262d; margin-top: 4px;
+    }
+    .virtual-tag {
+      position: absolute; bottom: 12px; right: 14px;
+      font-size: 10px; color: #484f58; font-style: italic;
+    }
+
+    #notif-btn {
+      background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+      color: #8b949e; padding: 6px 12px; font-size: 12px; cursor: pointer;
+      white-space: nowrap; transition: all .15s;
+    }
+    #notif-btn:hover { border-color: #f0883e; color: #f0883e; }
+    #notif-btn.on { background: #f0883e18; border-color: #f0883e50; color: #f0883e; }
+    #track-btn {
+      background: #bc8cff18; border: 1px solid #bc8cff50; border-radius: 6px;
+      color: #bc8cff; padding: 6px 12px; font-size: 12px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all .15s;
+    }
+    #track-btn:hover { background: #bc8cff30; border-color: #bc8cff; }
+    #track-btn:disabled { opacity: .45; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<header>
+  <a class="back-btn" href="/">← Live</a>
+  <div class="logo">🎯 Pro Bets</div>
+  <div class="badge">DB-TRACKED</div>
+  <div class="dot"></div>
+  <div class="spacer"></div>
+  <button id="track-btn" onclick="trackNow()">🔍 Track Pro Bets</button>
+  <button id="notif-btn">🔕 Enable Alerts</button>
+  <span class="refresh-label">Next refresh in</span>
+  <div id="countdown">30s</div>
+</header>
+
+<div class="criteria">
+  <span>⏱️ <strong>First goal after 15'</strong> — or no goal in 1st half at all</span>
+  <span>🟨 <strong>Under 3 yellow cards</strong> — total across both teams, ever</span>
+  <span>🚫 <strong>No red cards</strong> — at any point in the match</span>
+  <span>🕐 <strong>HT alert</strong> → ❌ voided if goal 45'–55' → <strong>55' alert</strong></span>
+</div>
+
+<div class="stats">
+  <div class="stat"><div class="val orange" id="spro">—</div><div class="lbl">Qualifying Now</div></div>
+  <div class="stat"><div class="val" id="stotal">—</div><div class="lbl">Tracked Total</div></div>
+  <div class="stat"><div class="val" id="sleagues">—</div><div class="lbl">Leagues</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="search-wrap">
+    <input type="text" id="search" placeholder="Search team or league…" />
+  </div>
+  <select id="sort">
+    <option value="minute">Sort: Minute ↓</option>
+    <option value="league">Sort: League</option>
+    <option value="time">Sort: Kick-off</option>
+  </select>
+</div>
+
+<div class="grid" id="grid">
+  <div class="state"><div class="spinner"></div>Analysing tracked matches…</div>
+</div>
+<div class="foot" id="foot"></div>
+
+<script>
+  const REFRESH_SEC = 30;
+  let allMatches = [];
+  let trackedTotal = 0;
+  let countdown = REFRESH_SEC;
+  let timer;
+
+  function parseMin(match_time) {
+    if (!match_time) return 0;
+    return parseInt(match_time.split(':')[0]) || 0;
+  }
+
+  function fmtScore(s) {
+    if (!s || s === '-:-' || s === '') return 'vs';
+    return s.replace(':', ' - ');
+  }
+
+  function renderCard(m) {
+    const min   = parseMin(m.match_time);
+    const score = fmtScore(m.current_score);
+    const htScoreLabel = m.ht_score && m.ht_score !== '-:-' && m.ht_score !== ''
+      ? m.ht_score.replace(':', ' - ') : null;
+
+  function renderCard(m) {
+    const min      = parseMin(m.match_time);
+    const score    = fmtScore(m.current_score);
+    const isHT     = (m.event_status || '') === 'half time';
+    const htScore  = m.ht_score && m.ht_score !== '-:-' && m.ht_score !== ''
+      ? m.ht_score.replace(':', ' - ') : null;
+
+    const minLabel   = isHT ? 'HT' : `${min}'`;
+    const badgeCls   = isHT ? 'min-badge ht-stage' : 'min-badge';
+    const stageLabel = isHT ? '🕐 Pro Bet at Half Time' : `🎯 Pro Bet at ${min}'`;
+
+    const goalMin   = m.first_goal_min;
+    const goalLabel = goalMin === null || goalMin === undefined
+      ? 'No goal in 1st half'
+      : `First goal: ${goalMin}'`;
+
+    const totalY = (m.home_yellow || 0) + (m.away_yellow || 0);
+
+    const checks = [
+      `✓ Tracked from kickoff`,
+      `✓ ${goalLabel}`,
+      `✓ 🟨 ${m.home_yellow||0}+${m.away_yellow||0}=${totalY} — No red cards`,
+    ];
+    const checksHtml = checks.map(c => `<div class="chk">${c}</div>`).join('');
+
+    const h1 = m.home_odd    ? `<div class="odd-btn"><span class="odd-label">1</span><span class="odd-val">${m.home_odd}</span></div>` : '';
+    const hx = m.neutral_odd ? `<div class="odd-btn"><span class="odd-label">X</span><span class="odd-val">${m.neutral_odd}</span></div>` : '';
+    const h2 = m.away_odd    ? `<div class="odd-btn"><span class="odd-label">2</span><span class="odd-val">${m.away_odd}</span></div>` : '';
+
+    const metaParts = [
+      htScore ? `🕐 HT ${htScore}` : '',
+      (m.home_corners||0)+(m.away_corners||0) > 0 ? `⛳ ${m.home_corners||0}-${m.away_corners||0}` : '',
+    ].filter(Boolean).join('  ·  ');
+
+    const virtualTag = m.is_virtual ? `<span class="virtual-tag">🎮 Virtual</span>` : '';
+
+    return `
+    <div class="card">
+      <span class="pro-tag">${stageLabel}</span>
+      ${virtualTag}
+      <div class="card-top">
+        <span class="league-name">${m.competition || ''} · ${m.category || ''}</span>
+        <span class="${badgeCls}">${minLabel}</span>
+      </div>
+      <div class="teams-row">
+        <div class="team home">${m.home_team}</div>
+        <div class="score-block">${score}</div>
+        <div class="team away">${m.away_team}</div>
+      </div>
+      <div class="checks">${checksHtml}</div>
+      ${metaParts ? `<div class="meta"><span>${metaParts}</span></div>` : ''}
+      ${h1||hx||h2 ? `<div class="odds-row">${h1}${hx}${h2}</div>` : ''}
+    </div>`;
+  }
+
+  function applyFilters() {
+    const q       = document.getElementById('search').value.toLowerCase();
+    const sortVal = document.getElementById('sort').value;
+
+    let list = q
+      ? allMatches.filter(m =>
+          (m.home_team||'').toLowerCase().includes(q) ||
+          (m.away_team||'').toLowerCase().includes(q) ||
+          (m.competition||'').toLowerCase().includes(q))
+      : [...allMatches];
+
+    // Real soccer always above virtual/zoom
+    list.sort((a, b) => {
+      const av = a.is_virtual || 0;
+      const bv = b.is_virtual || 0;
+      if (av !== bv) return av - bv; // real (0) before virtual (1)
+
+      if (sortVal === 'league') return (a.competition||'').localeCompare(b.competition||'');
+      if (sortVal === 'time')   return new Date(a.start_time) - new Date(b.start_time);
+      // default: minute descending
+      return parseMin(b.match_time) - parseMin(a.match_time);
+    });
+
+    return list;
+  }
+
+  function render() {
+    const list    = applyFilters();
+    const leagues = new Set(allMatches.map(m => m.competition).filter(Boolean));
+
+    document.getElementById('spro').textContent     = allMatches.length;
+    document.getElementById('stotal').textContent   = trackedTotal;
+    document.getElementById('sleagues').textContent = leagues.size;
+
+    const grid = document.getElementById('grid');
+    if (!list.length) {
+      grid.innerHTML = `
+        <div class="state">
+          <span class="icon">🎯</span>
+          No qualifying matches right now.
+          <div class="sub">Matches are tracked from kickoff. Pro Bets appear here once they reach 55'–90' in the 2nd half and meet all criteria.</div>
+        </div>`;
+      return;
+    }
+
+    // Insert a divider between real and virtual sections
+    const parts = [];
+    let shownDivider = false;
+    for (const m of list) {
+      if (!shownDivider && m.is_virtual) {
+        parts.push(`<div class="section-divider">🎮 Zoom / Virtual Leagues</div>`);
+        shownDivider = true;
+      }
+      parts.push(renderCard(m));
+    }
+    grid.innerHTML = parts.join('');
+  }
+
+  async function fetchProBets(silent = false) {
+    if (!silent) document.getElementById('grid').innerHTML = '<div class="state"><div class="spinner"></div>Analysing tracked matches…</div>';
+    try {
+      const res  = await fetch('/api/pro-bets');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!json.ok) throw new Error(json.error || 'API error');
+      allMatches   = json.matches || [];
+      trackedTotal = json.total   || 0;
+      document.getElementById('foot').textContent =
+        `Last updated: ${new Date(json.fetched_at).toLocaleTimeString()}  ·  ${allMatches.length} qualifying / ${trackedTotal} tracked`;
+      render();
+    } catch (err) {
+      if (!silent) document.getElementById('grid').innerHTML = `
+        <div class="state">
+          <span class="icon">⚠️</span>Failed to load
+          <div class="error-detail">${err.message}</div>
+          <button class="retry-btn" onclick="fetchProBets()">Retry</button>
+        </div>`;
+    }
+  }
+
+  function startCountdown() {
+    clearInterval(timer);
+    countdown = REFRESH_SEC;
+    document.getElementById('countdown').textContent = countdown + 's';
+    timer = setInterval(() => {
+      countdown--;
+      document.getElementById('countdown').textContent = countdown + 's';
+      if (countdown <= 0) { fetchProBets(true); countdown = REFRESH_SEC; }
+    }, 1000);
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('sort').addEventListener('change', render);
+
+  fetchProBets();
+  startCountdown();
+
+  async function trackNow() {
+    const btn = document.getElementById('track-btn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Scanning…';
+    try {
+      const res  = await fetch('/api/track-now', { method: 'POST' });
+      const json = await res.json();
+      if (json.count > 0) {
+        btn.textContent = `✓ Locked ${json.count} match${json.count > 1 ? 'es' : ''}`;
+        btn.style.color = '#3fb950';
+        btn.style.borderColor = '#3fb95050';
+        // refresh the list right away
+        await fetchProBets(true);
+      } else {
+        btn.textContent = '— No kicks in last 5\'';
+      }
+    } catch (e) {
+      btn.textContent = '⚠ Error';
+    } finally {
+      setTimeout(() => {
+        btn.disabled = false;
+        btn.textContent = '🔍 Track Pro Bets';
+        btn.style.color = '';
+        btn.style.borderColor = '';
+      }, 4000);
+    }
+  }
+</script>
+<script src="/pwa.js"></script>
+</body>
+</html>

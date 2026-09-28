@@ -1,0 +1,66 @@
+{
+	"_id": "betika-live-soccer",
+	"startUrls": ["https://www.betika.com/en-ke/live"],
+	"selectors": [
+		{
+			"id": "live_game_row",
+			"type": "SelectorElement",
+			"selector": ".live__event-row, .prematch-event, .live-event, [class*='live-event'], [class*='event-row'], .event-item",
+			"multiple": true,
+			"delay": 5000,
+			"parentSelectors": ["_root"],
+			"uuid": "1",
+			"_note": "Delay 5s gives the React SPA time to load. Adjust selector after inspecting real DOM on betika.com/en-ke/live"
+		},
+		{
+			"id": "home_team",
+			"type": "SelectorText",
+			"selector": "[class*='home'] [class*='name'], [class*='team-one'], [class*='home-team'], .participant:first-child, [class*='participant']:first-child",
+			"multiple": false,
+			"delay": 0,
+			"parentSelectors": ["1"],
+			"uuid": "2"
+		},
+		{
+			"id": "away_team",
+			"type": "SelectorText",
+			"selector": "[class*='away'] [class*='name'], [class*='team-two'], [class*='away-team'], .participant:last-child, [class*='participant']:last-child",
+			"multiple": false,
+			"delay": 0,
+			"parentSelectors": ["1"],
+			"uuid": "3"
+		},
+		{
+			"id": "score",
+			"type": "SelectorText",
+			"selector": "[class*='score'], [class*='result'], [class*='live-score'], .score-board",
+			"multiple": false,
+			"delay": 0,
+			"parentSelectors": ["1"],
+			"uuid": "4"
+		},
+		{
+			"id": "match_time",
+			"type": "SelectorText",
+			"selector": "[class*='time'], [class*='clock'], [class*='minute'], .live-time, .match-time",
+			"multiple": false,
+			"delay": 0,
+			"parentSelectors": ["1"],
+			"uuid": "5"
+		},
+		{
+			"id": "league",
+			"type": "SelectorText",
+			"selector": "[class*='league'], [class*='competition'], [class*='tournament'], [class*='category'], .group-name",
+			"multiple": false,
+			"delay": 0,
+			"parentSelectors": ["1"],
+			"uuid": "6"
+		}
+	],
+	"rootSelector": {
+		"id": "_root",
+		"uuid": "0"
+	},
+	"sitemapSpecificationVersion": 1
+}
