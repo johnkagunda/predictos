@@ -10,7 +10,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Pro Bets" />
-  <link rel="apple-touch-icon" href="/icon-192.svg" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { background: #0d1117; color: #e6edf3; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
@@ -137,6 +137,14 @@
     }
     #track-btn:hover { background: #bc8cff30; border-color: #bc8cff; }
     #track-btn:disabled { opacity: .45; cursor: not-allowed; }
+    #install-btn {
+      display: none;
+      align-items: center; gap: 6px;
+      background: #f0883e; border: none; border-radius: 6px;
+      color: #0d1117; padding: 6px 14px; font-size: 12px; font-weight: 700;
+      cursor: pointer; white-space: nowrap;
+    }
+    #install-btn:hover { background: #e07730; }
   </style>
 </head>
 <body>
@@ -147,6 +155,7 @@
   <div class="badge">DB-TRACKED</div>
   <div class="dot"></div>
   <div class="spacer"></div>
+  <button id="install-btn" title="Install app">⬇️ Install App</button>
   <button id="track-btn" onclick="trackNow()">🔍 Track Pro Bets</button>
   <button id="notif-btn">🔕 Enable Alerts</button>
   <span class="refresh-label">Next refresh in</span>

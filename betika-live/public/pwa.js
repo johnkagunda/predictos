@@ -1,8 +1,45 @@
-/* ── PWA + Push Notifications shared helper ─────────────────────────────── */
+/* ── PWA + Push Notifications + Install prompt ──────────────────────────── */
 (async function () {
+  // ── Install prompt ────────────────────────────────────────────────────────
+  let deferredInstall = null;
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredInstall = e;
+    showInstallBtn();
+  });
+
+  window.addEventListener('appinstalled', () => {
+    deferredInstall = null;
+    hideInstallBtn();
+    console.log('[pwa] App installed');
+  });
+
+  function showInstallBtn() {
+    const btn = document.getElementById('install-btn');
+    if (btn) btn.style.display = 'flex';
+  }
+  function hideInstallBtn() {
+    const btn = document.getElementById('install-btn');
+    if (btn) btn.style.display = 'none';
+  }
+
+  // Wire install button click
+  const installBtn = document.getElementById('install-btn');
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredInstall) return;
+      deferredInstall.prompt();
+      const { outcome } = await deferredInstall.userChoice;
+      console.log('[pwa] Install outcome:', outcome);
+      deferredInstall = null;
+      if (outcome === 'accepted') hideInstallBtn();
+    });
+  }
+
+  // ── Service Worker + Push ─────────────────────────────────────────────────
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
 
-  // ── Register SW ──────────────────────────────────────────────────────────
   let reg;
   try {
     reg = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
@@ -11,7 +48,7 @@
     return;
   }
 
-  // ── Fetch VAPID public key ───────────────────────────────────────────────
+  // Fetch VAPID public key
   let vapidKey;
   try {
     const r = await fetch('/api/vapid-public');
@@ -29,87 +66,64 @@
     return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
   }
 
-  // ── Subscribe ─────────────────────────────────────────────────────────────
   async function subscribe() {
     const perm = await Notification.requestPermission();
-    if (perm !== 'granted') {
-      updateBtn(false, 'Notifications blocked');
-      return;
-    }
+    if (perm !== 'granted') { updateNotifBtn(false, 'Blocked'); return; }
     try {
       const sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey),
       });
       await fetch('/api/subscribe', {
-        method:  'POST',
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(sub),
+        body: JSON.stringify(sub),
       });
       localStorage.setItem('push_subscribed', '1');
-      updateBtn(true);
-      console.log('[pwa] Subscribed to push notifications');
+      updateNotifBtn(true);
     } catch (e) {
       console.warn('[pwa] Subscribe failed:', e);
-      updateBtn(false, 'Failed');
+      updateNotifBtn(false, 'Failed');
     }
   }
 
-  // ── Unsubscribe ───────────────────────────────────────────────────────────
   async function unsubscribe() {
     try {
       const sub = await reg.pushManager.getSubscription();
       if (sub) {
         await fetch('/api/subscribe', {
-          method:  'DELETE',
+          method: 'DELETE',
           headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ endpoint: sub.endpoint }),
+          body: JSON.stringify({ endpoint: sub.endpoint }),
         });
         await sub.unsubscribe();
       }
       localStorage.removeItem('push_subscribed');
-      updateBtn(false);
-      console.log('[pwa] Unsubscribed');
+      updateNotifBtn(false);
     } catch (e) {
       console.warn('[pwa] Unsubscribe failed:', e);
     }
   }
 
-  // ── Button UI ─────────────────────────────────────────────────────────────
-  function updateBtn(on, label) {
+  function updateNotifBtn(on, label) {
     const btn = document.getElementById('notif-btn');
     if (!btn) return;
-    if (on) {
-      btn.textContent = '🔔 Alerts ON';
-      btn.classList.add('on');
-      btn.title = 'Click to disable notifications';
-    } else {
-      btn.textContent = label || '🔕 Enable Alerts';
-      btn.classList.remove('on');
-      btn.title = 'Click to enable push notifications';
-    }
+    btn.textContent = on ? '🔔 Alerts ON' : (label || '🔕 Enable Alerts');
+    btn.classList.toggle('on', on);
   }
 
-  // ── Wire up button ────────────────────────────────────────────────────────
-  const btn = document.getElementById('notif-btn');
-  if (btn) {
-    // Check current state
+  const notifBtn = document.getElementById('notif-btn');
+  if (notifBtn) {
     const existing = await reg.pushManager.getSubscription();
-    updateBtn(!!existing);
-
-    btn.addEventListener('click', async () => {
+    updateNotifBtn(!!existing);
+    notifBtn.addEventListener('click', async () => {
       const sub = await reg.pushManager.getSubscription();
-      if (sub) {
-        await unsubscribe();
-      } else {
-        await subscribe();
-      }
+      sub ? await unsubscribe() : await subscribe();
     });
   }
 
-  // ── Auto-resubscribe if they had it on before ─────────────────────────────
-  const wasOn = localStorage.getItem('push_subscribed');
-  if (wasOn) {
+  // Auto-resubscribe if previously opted in
+  if (localStorage.getItem('push_subscribed')) {
     const existing = await reg.pushManager.getSubscription();
     if (!existing) await subscribe();
   }
