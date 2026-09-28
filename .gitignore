@@ -5,6 +5,7 @@ dist
 node_modules
 betika-live/matches.db
 betika-live/node_modules
+betika-live/public/icon-192.png
 
 /.vs/web-scraper-chrome-extension/v15/.suo
 /.vs/web-scraper-chrome-extension/v15
