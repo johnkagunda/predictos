@@ -22,44 +22,82 @@
     }
     .logo { font-size: 20px; font-weight: 800; color: #3fb950; letter-spacing: -.5px; }
     .badge { background: #3fb95018; color: #3fb950; border: 1px solid #3fb95040; border-radius: 99px; padding: 2px 10px; font-size: 12px; font-weight: 600; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; animation: blink 1.4s ease-in-out infinite; }
-    @keyframes blink { 0%,100%{opacity:1;box-shadow:0 0 0 0 #3fb95060}50%{opacity:.5;box-shadow:0 0 0 5px transparent} }
+    .live-dot { width: 8px; height: 8px; border-radius: 50%; background: #3fb950; animation: blink 1.4s ease-in-out infinite; flex-shrink: 0; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
     .spacer { flex: 1; }
     .refresh-label { font-size: 12px; color: #484f58; }
     #countdown { font-size: 12px; color: #3fb950; font-weight: 600; background: #3fb95018; border: 1px solid #3fb95030; border-radius: 4px; padding: 2px 7px; }
+    #notif-btn {
+      background: #21262d; border: 1px solid #30363d; border-radius: 6px;
+      color: #8b949e; padding: 6px 12px; font-size: 12px; cursor: pointer; white-space: nowrap;
+    }
+    #notif-btn.on { background: #3fb95018; border-color: #3fb95050; color: #3fb950; }
+    #install-btn {
+      display: none; align-items: center; gap: 6px;
+      background: #f0883e; border: none; border-radius: 6px;
+      color: #0d1117; padding: 6px 14px; font-size: 12px; font-weight: 700; cursor: pointer;
+    }
 
-    .stats { display: flex; gap: 10px; padding: 18px 24px 0; flex-wrap: wrap; }
-    .stat { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px 18px; min-width: 100px; }
-    .stat .val { font-size: 26px; font-weight: 700; }
+    .stats { display: flex; gap: 10px; padding: 16px 24px 0; flex-wrap: wrap; }
+    .stat { background: #161b22; border: 1px solid #21262d; border-radius: 8px; padding: 10px 18px; min-width: 90px; }
+    .stat .val { font-size: 24px; font-weight: 700; }
+    .stat .val.green { color: #3fb950; }
     .stat .lbl { font-size: 11px; color: #8b949e; margin-top: 1px; }
 
-    .toolbar { padding: 14px 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-    .search-wrap { position: relative; flex: 1; min-width: 180px; }
+    .toolbar { padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .search-wrap { position: relative; flex: 1; min-width: 160px; }
     .search-wrap input {
       width: 100%; background: #161b22; border: 1px solid #30363d; border-radius: 6px;
       color: #e6edf3; padding: 7px 10px 7px 32px; font-size: 13px; outline: none;
     }
     .search-wrap input:focus { border-color: #3fb950; }
     .search-wrap::before { content: '🔍'; position: absolute; left: 9px; top: 50%; transform: translateY(-50%); font-size: 12px; pointer-events: none; }
-    select { background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 7px 10px; font-size: 13px; cursor: pointer; outline: none; }
-    select:focus { border-color: #3fb950; }
-    .filter-tab { background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; padding: 7px 14px; font-size: 13px; cursor: pointer; }
+
+    .filter-tab { background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; padding: 7px 14px; font-size: 13px; cursor: pointer; white-space: nowrap; transition: all .15s; }
+    .filter-tab:hover { border-color: #484f58; color: #e6edf3; }
     .filter-tab.active { border-color: #3fb950; color: #3fb950; background: #3fb95018; }
+    /* Pro Bet filter button — special styling */
+    .filter-tab.probet-tab { border-color: #f0883e50; color: #f0883e; background: #f0883e10; }
+    .filter-tab.probet-tab:hover { border-color: #f0883e; background: #f0883e20; }
+    .filter-tab.probet-tab.active { border-color: #f0883e; background: #f0883e25; color: #f0883e; }
+
+    select { background: #161b22; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3; padding: 7px 10px; font-size: 13px; cursor: pointer; outline: none; }
 
     .grid { padding: 0 24px 32px; display: grid; gap: 8px; }
 
-    .card { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 14px 18px; transition: border-color .15s; }
-    .card:hover { border-color: #3fb95050; }
+    /* status dot on the card */
+    .pdot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 2px; }
+    .pdot.green  { background: #3fb950; box-shadow: 0 0 5px #3fb950; animation: pg 1.6s infinite; }
+    .pdot.orange { background: #f0883e; box-shadow: 0 0 5px #f0883e; animation: po 1.6s infinite; }
+    .pdot.gray   { background: #484f58; }
+    @keyframes pg { 0%,100%{opacity:1} 50%{opacity:.3} }
+    @keyframes po { 0%,100%{opacity:1} 50%{opacity:.4} }
 
-    .card-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+    .card { background: #161b22; border: 1px solid #21262d; border-radius: 10px; padding: 14px 18px; transition: border-color .15s; position: relative; }
+    .card:hover { border-color: #3fb95040; }
+    .card.pb-probet  { border-color: #3fb95040; }
+    .card.pb-probet:hover { border-color: #3fb950; }
+    .card.pb-watching { border-color: #f0883e30; }
+    .card.pb-tracking { border-color: #f0883e20; }
+
+    .card-top { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
     .league-name { font-size: 10px; color: #8b949e; text-transform: uppercase; letter-spacing: .6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
-
     .min-badge { border-radius: 5px; padding: 2px 8px; font-size: 12px; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
     .min-badge.live1 { background: #58a6ff18; color: #58a6ff; border: 1px solid #58a6ff40; }
     .min-badge.live2 { background: #3fb95018; color: #3fb950; border: 1px solid #3fb95040; }
     .min-badge.ht    { background: #f0883e18; color: #f0883e; border: 1px solid #f0883e40; }
     .min-badge.ft    { background: #8b949e18; color: #8b949e; border: 1px solid #8b949e40; }
     .min-badge.pre   { background: #bc8cff18; color: #bc8cff; border: 1px solid #bc8cff40; }
+
+    /* Pro Bet label tag top-right */
+    .pb-tag {
+      position: absolute; top: 12px; right: 12px;
+      font-size: 10px; font-weight: 700; border-radius: 4px; padding: 2px 8px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .pb-tag.green  { background: #3fb95020; color: #3fb950; border: 1px solid #3fb95050; }
+    .pb-tag.orange { background: #f0883e18; color: #f0883e; border: 1px solid #f0883e40; }
+    .pb-tag.gray   { background: #21262d; color: #8b949e; border: 1px solid #30363d; }
 
     .teams-row { display: flex; align-items: center; gap: 8px; }
     .team { flex: 1; font-size: 14px; font-weight: 600; }
@@ -72,9 +110,12 @@
     .score-block.live2 { border-color: #3fb950; color: #3fb950; }
     .score-block.live1 { border-color: #58a6ff; color: #58a6ff; }
     .score-block.ht    { border-color: #f0883e; color: #f0883e; }
+    .score-block.pb-green { border-color: #3fb950; color: #3fb950; }
 
-    .meta-row { display: flex; gap: 12px; margin-top: 8px; font-size: 11px; color: #484f58; }
-    .meta-row span { display: flex; align-items: center; gap: 3px; }
+    .meta-row { display: flex; gap: 12px; margin-top: 8px; font-size: 11px; color: #484f58; flex-wrap: wrap; }
+
+    .goals-row { display: flex; gap: 6px; margin-top: 7px; flex-wrap: wrap; }
+    .goal-item { font-size: 11px; background: #21262d; border: 1px solid #30363d; border-radius: 4px; padding: 2px 8px; color: #8b949e; }
 
     .odds-row { display: flex; gap: 6px; margin-top: 8px; }
     .odd-btn { flex: 1; background: #0d1117; border: 1px solid #30363d; border-radius: 5px; padding: 4px 6px; text-align: center; }
@@ -83,114 +124,79 @@
 
     .state { text-align: center; padding: 64px 20px; color: #8b949e; }
     .state .icon { font-size: 48px; display: block; margin-bottom: 12px; }
+    .state .sub { font-size: 12px; color: #484f58; margin-top: 8px; }
     .spinner { width: 34px; height: 34px; border: 3px solid #21262d; border-top-color: #3fb950; border-radius: 50%; animation: spin .75s linear infinite; margin: 0 auto 14px; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .retry-btn { margin-top: 14px; background: #3fb950; color: #0d1117; border: none; border-radius: 6px; padding: 8px 18px; font-weight: 700; font-size: 13px; cursor: pointer; }
-    .error-detail { font-size: 11px; color: #484f58; margin-top: 6px; font-family: monospace; }
     .foot { text-align: center; font-size: 11px; color: #484f58; padding: 12px 0 24px; }
-    .probets-btn {
-      background: #f0883e18; border: 1px solid #f0883e50; border-radius: 6px;
-      color: #f0883e; padding: 6px 14px; font-size: 13px; font-weight: 600;
-      cursor: pointer; text-decoration: none; white-space: nowrap;
-    }
-    .probets-btn:hover { background: #f0883e30; }
-    #notif-btn {
-      background: #21262d; border: 1px solid #30363d; border-radius: 6px;
-      color: #8b949e; padding: 6px 12px; font-size: 12px; cursor: pointer;
-      white-space: nowrap; transition: all .15s;
-    }
-    #notif-btn:hover { border-color: #3fb950; color: #3fb950; }
-    #notif-btn.on { background: #3fb95018; border-color: #3fb95050; color: #3fb950; }
-    #track-btn {
-      background: #bc8cff18; border: 1px solid #bc8cff50; border-radius: 6px;
-      color: #bc8cff; padding: 6px 12px; font-size: 12px; font-weight: 600;
-      cursor: pointer; white-space: nowrap; transition: all .15s;
-    }
-    #track-btn:hover { background: #bc8cff30; border-color: #bc8cff; }
-    #track-btn:disabled { opacity: .45; cursor: not-allowed; }
-    #install-btn {
-      display: none; /* shown by JS when browser fires beforeinstallprompt */
-      align-items: center; gap: 6px;
-      background: #f0883e; border: none; border-radius: 6px;
-      color: #0d1117; padding: 6px 14px; font-size: 12px; font-weight: 700;
-      cursor: pointer; white-space: nowrap;
-    }
-    #install-btn:hover { background: #e07730; }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">⚽ Betika Live</div>
+  <div class="logo">&#9917; Betika Live</div>
   <div class="badge">LIVE</div>
-  <div class="dot"></div>
+  <div class="live-dot"></div>
   <div class="spacer"></div>
-  <a class="probets-btn" href="/probets.html">🎯 Pro Bets</a>
-  <button id="install-btn" title="Install app">⬇️ Install App</button>
-  <button id="track-btn" onclick="trackNow()">🔍 Track Pro Bets</button>
-  <button id="notif-btn">🔕 Enable Alerts</button>
-  <span class="refresh-label">Next refresh in</span>
-  <div id="countdown">30s</div>
+  <button id="install-btn" title="Install app">&#11015;&#65039; Install</button>
+  <button id="notif-btn">&#128277; Alerts</button>
+  <span class="refresh-label">Next in</span>
+  <div id="countdown">15s</div>
 </header>
 
 <div class="stats">
-  <div class="stat"><div class="val" id="stotal">—</div><div class="lbl">Live Soccer</div></div>
-  <div class="stat"><div class="val" id="s2h">—</div><div class="lbl">2nd Half</div></div>
-  <div class="stat"><div class="val" id="s1h">—</div><div class="lbl">1st Half</div></div>
-  <div class="stat"><div class="val" id="sleagues">—</div><div class="lbl">Leagues</div></div>
+  <div class="stat"><div class="val" id="stotal">--</div><div class="lbl">Live Matches</div></div>
+  <div class="stat"><div class="val green" id="s-probet">--</div><div class="lbl">&#127919; Pro Bets</div></div>
+  <div class="stat"><div class="val" id="s2h">--</div><div class="lbl">2nd Half</div></div>
+  <div class="stat"><div class="val" id="s1h">--</div><div class="lbl">1st Half</div></div>
 </div>
 
 <div class="toolbar">
   <div class="search-wrap">
-    <input type="text" id="search" placeholder="Search team or league…" />
+    <input type="text" id="search" placeholder="Search team or league..." />
   </div>
   <button class="filter-tab active" data-filter="all">All</button>
+  <button class="filter-tab probet-tab" data-filter="probet">&#127919; Pro Bet</button>
   <button class="filter-tab" data-filter="2nd half">2nd Half</button>
   <button class="filter-tab" data-filter="1st half">1st Half</button>
   <button class="filter-tab" data-filter="half time">Half Time</button>
   <select id="sort">
     <option value="time">Sort: Kick-off</option>
-    <option value="league">Sort: League</option>
     <option value="minute">Sort: Minute</option>
+    <option value="league">Sort: League</option>
   </select>
 </div>
 
 <div class="grid" id="grid">
-  <div class="state"><div class="spinner"></div>Loading live games…</div>
+  <div class="state"><div class="spinner"></div>Loading live games...</div>
 </div>
 <div class="foot" id="foot"></div>
 
 <script>
-  const REFRESH_SEC = 30;
-  let allMatches = [];
-  let activeFilter = 'all';
-  let countdown = REFRESH_SEC;
-  let timer;
+  var REFRESH_SEC = 15;
+  var allMatches  = [];   // from /api/live-soccer
+  var proMap      = {};   // match_id -> stage ('tracking','watching','probet')
+  var activeFilter = 'all';
+  var countdown   = REFRESH_SEC;
+  var timer;
 
-  // ── Period helpers ────────────────────────────────────────────────────────
-  function normStatus(m) {
-    return (m.event_status || '').toLowerCase().trim();
-  }
+  function normStatus(m) { return (m.event_status || '').toLowerCase().trim(); }
 
   function badgeClass(m) {
-    const s = normStatus(m);
-    if (s === '2nd half') return 'live2';
-    if (s === '1st half') return 'live1';
+    var s = normStatus(m);
+    if (s === '2nd half')  return 'live2';
+    if (s === '1st half')  return 'live1';
     if (s === 'half time') return 'ht';
     if (s === 'ended' || s === 'finished' || s === 'ft') return 'ft';
     return 'pre';
   }
 
   function minuteLabel(m) {
-    if (m.match_time) {
-      // "59:04" → "59'"
-      const mins = m.match_time.split(':')[0];
-      const s = normStatus(m);
-      if (s === 'half time') return 'HT';
-      if (s === 'ended' || s === 'finished') return 'FT';
-      return `${parseInt(mins)}'`;
-    }
-    return normStatus(m).toUpperCase() || '?';
+    var s = normStatus(m);
+    if (s === 'half time') return 'HT';
+    if (s === 'ended' || s === 'finished' || s === 'ft') return 'FT';
+    if (m.match_time) return parseInt(m.match_time.split(':')[0]) + "'";
+    return s.toUpperCase() || '?';
   }
 
   function parseMinute(m) {
@@ -203,161 +209,202 @@
     return 'vs';
   }
 
-  // ── Card ──────────────────────────────────────────────────────────────────
-  function renderCard(m) {
-    const bc = badgeClass(m);
-    const label = minuteLabel(m);
-    const score = parseScore(m);
-    const isLive = bc === 'live1' || bc === 'live2';
-
-    const cardBorder = bc === 'live2' ? 'border-color:#3fb95030' : bc === 'live1' ? 'border-color:#58a6ff30' : '';
-
-    const h1  = m.home_odd    ? `<div class="odd-btn"><span class="odd-label">1</span><span class="odd-val">${m.home_odd}</span></div>` : '';
-    const hx  = m.neutral_odd ? `<div class="odd-btn"><span class="odd-label">X</span><span class="odd-val">${m.neutral_odd}</span></div>` : '';
-    const h2  = m.away_odd    ? `<div class="odd-btn"><span class="odd-label">2</span><span class="odd-val">${m.away_odd}</span></div>` : '';
-
-    const yc  = (m.home_yellow_card || 0) + (m.away_yellow_card || 0);
-    const rc  = (m.home_red_card || 0) + (m.away_red_card || 0);
-    const crn = (m.home_corners || 0) + (m.away_corners || 0);
-    const ht  = m.ht_score && m.ht_score !== '-:-' ? `<span>🕐 HT ${m.ht_score.replace(':', '-')}</span>` : '';
-    const meta = [
-      yc  ? `<span>🟨 ${m.home_yellow_card}-${m.away_yellow_card}</span>` : '',
-      rc  ? `<span>🟥 ${m.home_red_card}-${m.away_red_card}</span>` : '',
-      crn ? `<span>⛳ ${m.home_corners}-${m.away_corners}</span>` : '',
-      ht,
-    ].filter(Boolean).join('');
-
-    return `
-    <div class="card" style="${cardBorder}">
-      <div class="card-top">
-        <span class="league-name">${m.competition_name || ''} · ${m.category || ''}</span>
-        <span class="min-badge ${bc}">${label}</span>
-      </div>
-      <div class="teams-row">
-        <div class="team home">${m.home_team}</div>
-        <div class="score-block ${isLive ? bc : ''}">${score}</div>
-        <div class="team away">${m.away_team}</div>
-      </div>
-      ${meta ? `<div class="meta-row">${meta}</div>` : ''}
-      ${h1||hx||h2 ? `<div class="odds-row">${h1}${hx}${h2}</div>` : ''}
-    </div>`;
+  // Returns pro bet dot info for a match, or null if not in proMap
+  function pbInfo(m) {
+    var entry = proMap[m.match_id];
+    if (!entry) return null;
+    var stage = entry.stage;
+    if (stage === 'probet')   return { color: 'green',  label: 'Pro Bet',  goals: entry.goals };
+    if (stage === 'watching') return { color: 'orange', label: 'Watching', goals: entry.goals };
+    if (stage === 'tracking') return { color: 'gray',   label: 'Tracking', goals: entry.goals };
+    return null;
   }
 
-  // ── Filter + sort ─────────────────────────────────────────────────────────
-  function applyFilters() {
-    const q = document.getElementById('search').value.toLowerCase();
-    const sortVal = document.getElementById('sort').value;
+  function renderCard(m) {
+    var bc    = badgeClass(m);
+    var label = minuteLabel(m);
+    var score = parseScore(m);
+    var isLive = bc === 'live1' || bc === 'live2';
+    var pb    = pbInfo(m);
 
-    let list = activeFilter === 'all'
-      ? allMatches
-      : allMatches.filter(m => normStatus(m) === activeFilter);
-
-    if (q) {
-      list = list.filter(m =>
-        (m.home_team || '').toLowerCase().includes(q) ||
-        (m.away_team || '').toLowerCase().includes(q) ||
-        (m.competition_name || '').toLowerCase().includes(q)
-      );
+    var cardExtra = '';
+    if (pb) {
+      if (pb.color === 'green')  cardExtra = 'pb-probet';
+      else if (pb.color === 'orange') cardExtra = 'pb-watching';
+      else cardExtra = 'pb-tracking';
     }
 
-    if (sortVal === 'league') list = [...list].sort((a,b) => (a.competition_name||'').localeCompare(b.competition_name||''));
-    else if (sortVal === 'minute') list = [...list].sort((a,b) => parseMinute(b) - parseMinute(a));
-    else list = [...list].sort((a,b) => new Date(a.start_time) - new Date(b.start_time));
+    var scoreExtra = (pb && pb.color === 'green') ? 'pb-green' : (isLive ? bc : '');
+
+    var pbTagHtml = pb
+      ? '<div class="pb-tag ' + pb.color + '"><span class="pdot ' + pb.color + '"></span>' + pb.label + '</div>'
+      : '';
+
+    var h1  = m.home_odd    ? '<div class="odd-btn"><span class="odd-label">1</span><span class="odd-val">' + m.home_odd + '</span></div>' : '';
+    var hx  = m.neutral_odd ? '<div class="odd-btn"><span class="odd-label">X</span><span class="odd-val">' + m.neutral_odd + '</span></div>' : '';
+    var h2  = m.away_odd    ? '<div class="odd-btn"><span class="odd-label">2</span><span class="odd-val">' + m.away_odd + '</span></div>' : '';
+
+    var yc  = (m.home_yellow_card || 0) + (m.away_yellow_card || 0);
+    var rc  = (m.home_red_card    || 0) + (m.away_red_card    || 0);
+    var crn = (m.home_corners     || 0) + (m.away_corners     || 0);
+    var ht  = m.ht_score && m.ht_score !== '-:-' ? '<span>HT ' + m.ht_score.replace(':', '-') + '</span>' : '';
+    var metaParts = [];
+    if (yc)  metaParts.push('<span>&#127/&#129; ' + (m.home_yellow_card||0) + '-' + (m.away_yellow_card||0) + '</span>');
+    if (rc)  metaParts.push('<span>&#128308; ' + (m.home_red_card||0) + '-' + (m.away_red_card||0) + '</span>');
+    if (crn) metaParts.push('<span>&#9971; ' + (m.home_corners||0) + '-' + (m.away_corners||0) + '</span>');
+    if (ht)  metaParts.push(ht);
+    var metaHtml = metaParts.length ? '<div class="meta-row">' + metaParts.join('') + '</div>' : '';
+
+    var oddsHtml = (h1||hx||h2) ? '<div class="odds-row">' + h1 + hx + h2 + '</div>' : '';
+
+    // Goals list for tracked matches
+    var goalsHtml = '';
+    if (pb && pb.goals && pb.goals.length) {
+      var goalItems = pb.goals.map(function(g) {
+        var min = parseInt((g.match_time || '0').split(':')[0]) || 0;
+        return '<span class="goal-item">&#9917; ' + min + "' " + (g.detail || '') + '</span>';
+      }).join('');
+      goalsHtml = '<div class="goals-row">' + goalItems + '</div>';
+    }
+
+    // pad card-top right if pb tag exists
+    var cardTopStyle = pb ? 'padding-right:90px' : '';
+
+    return '<div class="card ' + cardExtra + '">' +
+      pbTagHtml +
+      '<div class="card-top" style="' + cardTopStyle + '">' +
+        '<span class="league-name">' + (m.competition_name || m.competition || '') + '</span>' +
+        '<span class="min-badge ' + bc + '">' + label + '</span>' +
+      '</div>' +
+      '<div class="teams-row">' +
+        '<div class="team home">' + m.home_team + '</div>' +
+        '<div class="score-block ' + scoreExtra + '">' + score + '</div>' +
+        '<div class="team away">' + m.away_team + '</div>' +
+      '</div>' +
+      metaHtml + goalsHtml + oddsHtml +
+    '</div>';
+  }
+
+  function applyFilters() {
+    var q = document.getElementById('search').value.toLowerCase();
+    var sortVal = document.getElementById('sort').value;
+
+    var list;
+    if (activeFilter === 'probet') {
+      // Show only matches that are in the proMap (any stage)
+      list = allMatches.filter(function(m) { return !!proMap[m.match_id]; });
+    } else if (activeFilter === 'all') {
+      list = allMatches.slice();
+    } else {
+      list = allMatches.filter(function(m) { return normStatus(m) === activeFilter; });
+    }
+
+    if (q) {
+      list = list.filter(function(m) {
+        return (m.home_team||'').toLowerCase().indexOf(q) >= 0 ||
+               (m.away_team||'').toLowerCase().indexOf(q) >= 0 ||
+               (m.competition_name||m.competition||'').toLowerCase().indexOf(q) >= 0;
+      });
+    }
+
+    // Sort: pro bets always float to top within any view
+    list.sort(function(a, b) {
+      var stageOrder = { probet: 0, watching: 1, tracking: 2 };
+      var pa = proMap[a.match_id] ? (stageOrder[proMap[a.match_id].stage] !== undefined ? stageOrder[proMap[a.match_id].stage] : 3) : 3;
+      var pb2 = proMap[b.match_id] ? (stageOrder[proMap[b.match_id].stage] !== undefined ? stageOrder[proMap[b.match_id].stage] : 3) : 3;
+      if (pa !== pb2) return pa - pb2;
+      if (sortVal === 'league') return (a.competition_name||'').localeCompare(b.competition_name||'');
+      if (sortVal === 'minute') return parseMinute(b) - parseMinute(a);
+      return new Date(a.start_time) - new Date(b.start_time);
+    });
 
     return list;
   }
 
   function render() {
-    const list = applyFilters();
-    const n2h = allMatches.filter(m => normStatus(m) === '2nd half').length;
-    const n1h = allMatches.filter(m => normStatus(m) === '1st half').length;
-    const leagues = new Set(allMatches.map(m => m.competition_name).filter(Boolean));
+    var list    = applyFilters();
+    var nProbet = Object.values(proMap).filter(function(e) { return e.stage === 'probet'; }).length;
+    var n2h     = allMatches.filter(function(m) { return normStatus(m) === '2nd half'; }).length;
+    var n1h     = allMatches.filter(function(m) { return normStatus(m) === '1st half'; }).length;
 
-    document.getElementById('stotal').textContent = allMatches.length;
-    document.getElementById('s2h').textContent = n2h;
-    document.getElementById('s1h').textContent = n1h;
-    document.getElementById('sleagues').textContent = leagues.size;
+    document.getElementById('stotal').textContent  = allMatches.length;
+    document.getElementById('s-probet').textContent = nProbet;
+    document.getElementById('s2h').textContent      = n2h;
+    document.getElementById('s1h').textContent      = n1h;
 
-    const grid = document.getElementById('grid');
-    grid.innerHTML = list.length
-      ? list.map(renderCard).join('')
-      : `<div class="state"><span class="icon">🕐</span>No matches for this filter right now.</div>`;
-  }
-
-  // ── Fetch ─────────────────────────────────────────────────────────────────
-  async function fetchGames(silent = false) {
-    if (!silent) document.getElementById('grid').innerHTML = '<div class="state"><div class="spinner"></div>Loading…</div>';
-    try {
-      const res = await fetch('/api/live-soccer');
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error || 'API error');
-      allMatches = json.matches || [];
-      document.getElementById('foot').textContent =
-        `Last updated: ${new Date(json.fetched_at).toLocaleTimeString()}  ·  ${allMatches.length} live soccer matches`;
-      render();
-    } catch (err) {
-      if (!silent) document.getElementById('grid').innerHTML = `
-        <div class="state">
-          <span class="icon">⚠️</span>Failed to load
-          <div class="error-detail">${err.message}</div>
-          <button class="retry-btn" onclick="fetchGames()">Retry</button>
-        </div>`;
+    var grid = document.getElementById('grid');
+    if (!list.length) {
+      var msg = activeFilter === 'probet'
+        ? 'No pro bets yet. Matches kicking off within 10 mins are tracked automatically.'
+        : 'No matches for this filter.';
+      grid.innerHTML = '<div class="state"><span class="icon">&#9917;</span>' + msg + '</div>';
+      return;
     }
+    grid.innerHTML = list.map(renderCard).join('');
   }
 
-  // ── Countdown ─────────────────────────────────────────────────────────────
+  function fetchProMap() {
+    return fetch('/api/pro-bets')
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        proMap = {};
+        if (json.ok && json.matches) {
+          json.matches.forEach(function(m) {
+            proMap[m.match_id] = { stage: m.stage, goals: m.goals || [] };
+          });
+        }
+      })
+      .catch(function() {});
+  }
+
+  function fetchGames(silent) {
+    if (!silent) document.getElementById('grid').innerHTML = '<div class="state"><div class="spinner"></div>Loading...</div>';
+    return fetch('/api/live-soccer')
+      .then(function(r) { return r.json(); })
+      .then(function(json) {
+        if (!json.ok) throw new Error(json.error || 'API error');
+        allMatches = json.matches || [];
+        document.getElementById('foot').textContent =
+          'Updated ' + new Date(json.fetched_at).toLocaleTimeString() +
+          '  |  ' + allMatches.length + ' live matches';
+      });
+  }
+
+  function refresh(silent) {
+    // fetch both in parallel, then render
+    Promise.all([fetchGames(silent), fetchProMap()])
+      .then(function() { render(); })
+      .catch(function(err) {
+        if (!silent) document.getElementById('grid').innerHTML =
+          '<div class="state"><span class="icon">&#9888;&#65039;</span>Failed to load<div class="sub">' + err.message + '</div>' +
+          '<button class="retry-btn" onclick="refresh()">Retry</button></div>';
+      });
+  }
+
   function startCountdown() {
     clearInterval(timer);
     countdown = REFRESH_SEC;
     document.getElementById('countdown').textContent = countdown + 's';
-    timer = setInterval(() => {
+    timer = setInterval(function() {
       countdown--;
       document.getElementById('countdown').textContent = countdown + 's';
-      if (countdown <= 0) { fetchGames(true); countdown = REFRESH_SEC; }
+      if (countdown <= 0) { refresh(true); countdown = REFRESH_SEC; }
     }, 1000);
   }
 
-  // ── Events ────────────────────────────────────────────────────────────────
   document.getElementById('search').addEventListener('input', render);
   document.getElementById('sort').addEventListener('change', render);
-  document.querySelectorAll('.filter-tab').forEach(btn => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.filter-tab').forEach(function(b) { b.classList.remove('active'); });
       btn.classList.add('active');
       activeFilter = btn.dataset.filter;
       render();
     });
   });
 
-  fetchGames();
+  refresh();
   startCountdown();
-
-  async function trackNow() {
-    const btn = document.getElementById('track-btn');
-    btn.disabled = true;
-    btn.textContent = '⏳ Scanning…';
-    try {
-      const res  = await fetch('/api/track-now', { method: 'POST' });
-      const json = await res.json();
-      if (json.count > 0) {
-        btn.textContent = `✓ Locked ${json.count} match${json.count > 1 ? 'es' : ''}`;
-        btn.style.color = '#3fb950';
-        btn.style.borderColor = '#3fb95050';
-      } else {
-        btn.textContent = '— No new kicks';
-      }
-    } catch (e) {
-      btn.textContent = '⚠ Error';
-    } finally {
-      setTimeout(() => {
-        btn.disabled = false;
-        btn.textContent = '🔍 Track Pro Bets';
-        btn.style.color = '';
-        btn.style.borderColor = '';
-      }, 4000);
-    }
-  }
 </script>
 <script src="/pwa.js"></script>
 </body>

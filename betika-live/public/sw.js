@@ -1,4 +1,4 @@
-const CACHE = 'betika-v1';
+const CACHE = 'betika-v3';
 const PRECACHE = ['/', '/probets.html', '/manifest.json'];
 
 // ── Install: cache shell ──────────────────────────────────────────────────
@@ -27,7 +27,18 @@ self.addEventListener('fetch', e => {
     })));
     return;
   }
-  // cache-first for static
+  // network-first for HTML pages so updates are always picked up
+  if (url.pathname === '/' || url.pathname.endsWith('.html')) {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const clone = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, clone));
+        return res;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+  // cache-first for other static assets
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
@@ -60,7 +71,7 @@ self.addEventListener('notificationclick', e => {
   e.notification.close();
   if (e.action === 'dismiss') return;
 
-  const target = e.notification.data?.url || '/probets.html';
+  const target = e.notification.data?.url || '/?filter=probet';
   e.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
       for (const client of list) {

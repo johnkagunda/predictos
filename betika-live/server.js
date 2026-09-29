@@ -51,15 +51,25 @@ db.exec(`
     -- derived tracking (set once, never overwritten)
     tracked_from_start INTEGER DEFAULT 0, -- 1 = we saw this game from min 0-10
     first_goal_min  INTEGER,              -- minute goals first went >0 (NULL = no goal yet)
-    max_yellow      INTEGER DEFAULT 0,    -- highest yellow count seen at any point
     had_red         INTEGER DEFAULT 0,    -- 1 = red card seen at any point
-    disqualified    INTEGER DEFAULT 0,    -- 1 = red card OR >=3 yellows ever seen
+    disqualified    INTEGER DEFAULT 0,    -- 1 = red card ever seen
 
     notified        INTEGER DEFAULT 0,    -- 1 = push already sent (55min stage)
     notified_ht     INTEGER DEFAULT 0,    -- 1 = halftime alert sent
     notified_55     INTEGER DEFAULT 0,    -- 1 = 55min alert sent
     voided          INTEGER DEFAULT 0,    -- 1 = goal scored 45-55min, bet voided
     updated_at      TEXT
+  );
+
+  CREATE TABLE IF NOT EXISTS match_events (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    match_id    INTEGER NOT NULL,
+    event_type  TEXT NOT NULL,           -- 'goal', 'red_card'
+    match_time  TEXT,
+    score_before TEXT,
+    score_after  TEXT,
+    detail      TEXT,                    -- extra info (e.g. which team scored)
+    recorded_at TEXT NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS subscriptions (
@@ -80,7 +90,6 @@ db.exec(`
 	add('ended_at',            'TEXT');
 	add('tracked_from_start',  'INTEGER DEFAULT 0');
 	add('first_goal_min',      'INTEGER');
-	add('max_yellow',          'INTEGER DEFAULT 0');
 	add('had_red',             'INTEGER DEFAULT 0');
 	add('disqualified',        'INTEGER DEFAULT 0');
 	add('notified',            'INTEGER DEFAULT 0');
@@ -89,6 +98,8 @@ db.exec(`
 	add('voided',              'INTEGER DEFAULT 0');
 	add('set1_score',          'TEXT');
 	add('set2_score',          'TEXT');
+
+	// migrate: drop max_yellow column gracefully (SQLite can't DROP COLUMN before 3.35 — just ignore it)
 }
 
 // ── Prepared statements ───────────────────────────────────────────────────
@@ -102,7 +113,7 @@ const stmtUpsert = db.prepare(`
     event_status, match_time, current_score, ht_score, set1_score, set2_score,
     home_yellow, away_yellow, home_red, away_red, home_corners, away_corners,
     home_odd, away_odd, neutral_odd,
-    tracked_from_start, first_goal_min, max_yellow, had_red, disqualified,
+    tracked_from_start, first_goal_min, had_red, disqualified,
     notified, notified_ht, notified_55, voided,
     updated_at
   ) VALUES (
@@ -111,7 +122,7 @@ const stmtUpsert = db.prepare(`
     @event_status, @match_time, @current_score, @ht_score, @set1_score, @set2_score,
     @home_yellow, @away_yellow, @home_red, @away_red, @home_corners, @away_corners,
     @home_odd, @away_odd, @neutral_odd,
-    @tracked_from_start, @first_goal_min, @max_yellow, @had_red, @disqualified,
+    @tracked_from_start, @first_goal_min, @had_red, @disqualified,
     0, 0, 0, 0,
     @updated_at
   )
@@ -135,11 +146,18 @@ const stmtUpsert = db.prepare(`
     ended_at            = COALESCE(matches.ended_at,       excluded.ended_at),
     tracked_from_start  = CASE WHEN matches.tracked_from_start = 1 THEN 1 ELSE excluded.tracked_from_start END,
     first_goal_min      = COALESCE(matches.first_goal_min, excluded.first_goal_min),
-    max_yellow          = CASE WHEN excluded.max_yellow > matches.max_yellow THEN excluded.max_yellow ELSE matches.max_yellow END,
     had_red             = CASE WHEN matches.had_red = 1 THEN 1 ELSE excluded.had_red END,
     disqualified        = CASE WHEN matches.disqualified = 1 THEN 1 ELSE excluded.disqualified END,
     updated_at          = excluded.updated_at;
 `);
+
+const stmtInsertEvent = db.prepare(`
+  INSERT INTO match_events (match_id, event_type, match_time, score_before, score_after, detail, recorded_at)
+  VALUES (@match_id, @event_type, @match_time, @score_before, @score_after, @detail, @recorded_at)
+`);
+
+// In-memory snapshot: match_id -> { score, home_red, away_red }
+const snapshots = new Map();
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const HEADERS = {
@@ -148,6 +166,35 @@ const HEADERS = {
 	Referer:      'https://www.betika.com/en-ke/live/soccer',
 	Origin:       'https://www.betika.com',
 };
+
+// Soccer-only statuses — anything else is a different sport (hockey periods, etc.)
+const SOCCER_STATUSES = new Set([
+	'1st half', '2nd half', 'half time',
+	'ended', 'finished', 'ft', 'complete', 'completed',
+	'not started', 'postponed', 'cancelled',
+]);
+
+// Non-soccer competition/sport keywords
+const NON_SOCCER_PATTERNS = [
+	/handball/i, /basketball/i, /\bhockey\b/i, /\btennis\b/i, /volleyball/i,
+	/\brugby\b/i, /cricket/i, /baseball/i, /\bnba\b/i, /\bnhl\b/i,
+	/\bnfl\b/i, /\bmlb\b/i, /futsal/i, /\behf\b/i, /\biihf\b/i,
+	/\bfiba\b/i, /\batp\b/i, /\bwta\b/i,
+];
+
+function isSoccer(m) {
+	const status = (m.event_status || '').toLowerCase().trim();
+	if (!SOCCER_STATUSES.has(status)) return false;
+	if (m.sport_id && m.sport_id !== 14) return false;
+	const name = (m.competition_name || '') + ' ' + (m.sport_name || '') + ' ' + (m.category || '');
+	if (NON_SOCCER_PATTERNS.some(p => p.test(name))) return false;
+	// Handball 1st half goes 0→30 min per half — if status='1st half' and mins > 50 it's not soccer
+	if (status === '1st half') {
+		const mins = parseInt((m.match_time || '0').split(':')[0]) || 0;
+		if (mins > 50) return false;
+	}
+	return true;
+}
 
 // Competition names that indicate virtual/zoom/esport leagues
 const VIRTUAL_PATTERNS = [
@@ -213,39 +260,72 @@ async function sendPush(payload) {
 }
 
 // ── Pro Bets query ────────────────────────────────────────────────────────
-// Returns active pro bets: either at HT (alerted) or in 2nd half 55-90 (not voided)
+// Returns three stages:
+//   'tracking' — 1st half ≤ 10', being tracked, no disqualifying event yet
+//   'watching' — 1st half > 10' or half time, still clean, waiting
+//   'probets'  — 2nd half ≥ 55', no goal, perfect pro bet
 function getProBets() {
 	return db.prepare(`
 		SELECT *,
 		  CASE
-		    WHEN event_status = 'half time'  THEN 'ht'
-		    WHEN event_status = '2nd half'   THEN '55'
-		    ELSE 'ht'
+		    WHEN event_status = '1st half'
+		         AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 10
+		         THEN 'tracking'
+		    WHEN event_status = '1st half'
+		         AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) > 10
+		         THEN 'watching'
+		    WHEN event_status = 'half time'
+		         THEN 'watching'
+		    WHEN event_status = '2nd half'
+		         AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) >= 55
+		         THEN 'probet'
+		    ELSE NULL
 		  END as stage
 		FROM matches
 		WHERE
 			is_virtual = 0
-			AND tracked_from_start = 1
 			AND disqualified = 0
-			AND (first_goal_min IS NULL OR first_goal_min > 15)
 			AND voided = 0
 			AND (
-			  -- HT stage: alerted at HT, not yet in 2nd half
-			  (event_status = 'half time' AND notified_ht = 1)
+			  -- Being tracked: 1st half, within first 10 minutes (show immediately, no tracked_from_start needed)
+			  (
+			    event_status = '1st half'
+			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 10
+			  )
 			  OR
-			  -- 55-min stage: in 2nd half 55-90, ht alert already sent
+			  -- Watching: 1st half past 10', tracked from start, no early goal
+			  (
+			    event_status = '1st half'
+			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) > 10
+			    AND tracked_from_start = 1
+			    AND (first_goal_min IS NULL OR first_goal_min > 15)
+			  )
+			  OR
+			  -- Watching: half time, tracked, no early goal
+			  (
+			    event_status = 'half time'
+			    AND tracked_from_start = 1
+			    AND (first_goal_min IS NULL OR first_goal_min > 15)
+			  )
+			  OR
+			  -- Perfect pro bet: 2nd half >=55', tracked, no early goal
 			  (
 			    event_status = '2nd half'
-			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time, ':') - 1) AS INTEGER) BETWEEN 55 AND 90
-			    AND notified_ht = 1
+			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) >= 55
+			    AND tracked_from_start = 1
+			    AND (first_goal_min IS NULL OR first_goal_min > 15)
 			  )
 			)
 		ORDER BY
-			-- HT first, then by minute descending
-			CASE event_status WHEN 'half time' THEN 0 ELSE 1 END ASC,
-			CAST(SUBSTR(match_time, 1, INSTR(match_time, ':') - 1) AS INTEGER) DESC
+			CASE
+			  WHEN event_status = '2nd half' THEN 0
+			  WHEN event_status = 'half time' THEN 1
+			  ELSE 2
+			END ASC,
+			CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) DESC
 	`).all();
 }
+
 
 // ── Poll loop ─────────────────────────────────────────────────────────────
 async function poll() {
@@ -261,7 +341,7 @@ async function poll() {
 	const liveIds  = new Set(matches.map(m => m.match_id));
 
 	// ── Check for matches that have disappeared from the live feed ────────
-	// If a match was in DB and is now gone, it likely ended — delete it
+	// If a match was in-progress and is now gone from the feed, the game is over — delete immediately
 	const trackedInProgress = db.prepare(`
 		SELECT match_id FROM matches
 		WHERE event_status IN ('1st half', '2nd half', 'half time')
@@ -269,21 +349,17 @@ async function poll() {
 
 	for (const row of trackedInProgress) {
 		if (!liveIds.has(row.match_id)) {
+			// Delete events too, then the match
+			db.prepare('DELETE FROM match_events WHERE match_id = ?').run(row.match_id);
 			stmtDelete.run(row.match_id);
+			snapshots.delete(row.match_id);
 		}
 	}
 
-	// ── Also hard-delete anything marked ended more than 5 mins ago ───────
-	db.prepare(`
-		DELETE FROM matches
-		WHERE ended_at IS NOT NULL
-		AND (julianday('now') - julianday(ended_at)) * 86400 > 300
-	`).run();
-
 	// ── Process live matches ──────────────────────────────────────────────
 	for (const m of matches) {
-		// Skip zoom/virtual entirely — don't even store them
-		if (isVirtual(m)) continue;
+		// Skip non-soccer and virtual entirely — don't even store them
+		if (!isSoccer(m) || isVirtual(m)) continue;
 
 		const status  = (m.event_status || '').toLowerCase().trim();
 		const min     = getMin(m.match_time);
@@ -311,12 +387,59 @@ async function poll() {
 		let first_goal_min = existing?.first_goal_min ?? null;
 		if (first_goal_min === null && goals > 0) first_goal_min = min;
 
-		// ── max_yellow: highest yellow count ever seen ────────────────────
-		const max_yellow = Math.max(existing?.max_yellow || 0, yellows);
-
-		// ── had_red / disqualified: sticky flags ─────────────────────────
+		// ── had_red / disqualified: sticky flags — only red cards now ────────
 		const had_red      = (existing?.had_red === 1 || reds > 0) ? 1 : 0;
-		const disqualified = (existing?.disqualified === 1 || reds > 0 || yellows >= 3) ? 1 : 0;
+		const disqualified = (existing?.disqualified === 1 || reds > 0) ? 1 : 0;
+
+		// ── Snapshot comparison: detect goals and red cards ───────────────
+		const prev = snapshots.get(m.match_id);
+		const snap = { score, home_red: m.home_red_card || 0, away_red: m.away_red_card || 0 };
+		snapshots.set(m.match_id, snap);
+
+		if (prev) {
+			const prevGoals = parseGoals(prev.score);
+			const currGoals = parseGoals(score);
+			if (currGoals > prevGoals) {
+				// Determine which team scored by comparing sides
+				const [ph, pa] = (prev.score || '0:0').split(':').map(Number);
+				const [ch, ca] = (score || '0:0').split(':').map(Number);
+				let detail = '';
+				if (ch > ph) detail = `${m.home_team} scored`;
+				else if (ca > pa) detail = `${m.away_team} scored`;
+				else detail = 'Goal';
+				stmtInsertEvent.run({
+					match_id:    m.match_id,
+					event_type:  'goal',
+					match_time:  m.match_time || '',
+					score_before: prev.score,
+					score_after:  score,
+					detail,
+					recorded_at: now,
+				});
+			}
+			if (snap.home_red > prev.home_red) {
+				stmtInsertEvent.run({
+					match_id:    m.match_id,
+					event_type:  'red_card',
+					match_time:  m.match_time || '',
+					score_before: prev.score,
+					score_after:  score,
+					detail:      `${m.home_team} red card`,
+					recorded_at: now,
+				});
+			}
+			if (snap.away_red > prev.away_red) {
+				stmtInsertEvent.run({
+					match_id:    m.match_id,
+					event_type:  'red_card',
+					match_time:  m.match_time || '',
+					score_before: prev.score,
+					score_after:  score,
+					detail:      `${m.away_team} red card`,
+					recorded_at: now,
+				});
+			}
+		}
 
 		stmtUpsert.run({
 			match_id:          m.match_id,
@@ -345,7 +468,6 @@ async function poll() {
 			neutral_odd:       m.neutral_odd        || '',
 			tracked_from_start: trackedFromStart,
 			first_goal_min,
-			max_yellow,
 			had_red,
 			disqualified,
 			updated_at: now,
@@ -353,16 +475,15 @@ async function poll() {
 	}
 
 	// ── Base criteria check (shared across all stages) ──────────────────
-	// A match qualifies if tracked from start, not disqualified, first goal > 15' or none
 	const baseOk = `
 		is_virtual = 0
 		AND tracked_from_start = 1
 		AND disqualified = 0
+		AND voided = 0
 		AND (first_goal_min IS NULL OR first_goal_min > 15)
 	`;
 
 	// ── STAGE 1: Half-time alert ──────────────────────────────────────────
-	// Fires once when match enters half time and criteria are met
 	const htAlerts = db.prepare(`
 		SELECT * FROM matches
 		WHERE ${baseOk}
@@ -374,29 +495,23 @@ async function poll() {
 		db.prepare('UPDATE matches SET notified_ht = 1 WHERE match_id = ?').run(bet.match_id);
 		const sc = (bet.ht_score || bet.current_score || '').replace(':', ' - ') || 'HT';
 		await sendPush({
-			title:    `🎯 Pro Bet at Half Time`,
-			body:     `${bet.home_team} ${sc} ${bet.away_team}\n${bet.competition}`,
-			url:      '/probets.html',
+			title:    `🟠 Watching at Half Time`,
+			body:     `${bet.home_team} ${sc} ${bet.away_team} — ${bet.competition}`,
+			url:      '/',
 			match_id: bet.match_id,
 			stage:    'ht',
 		});
 	}
 	if (htAlerts.length) console.log(`[push-ht] ${htAlerts.length} half-time alert(s)`);
 
-	// ── STAGE 2: Void check (goal scored between 45'–55') ────────────────
-	// set2_score is the 2nd half running score from the API.
-	// If it shows a goal while minute is still <= 55, the bet is voided.
+	// ── STAGE 2: Void check (goal scored 45'–55' in 2nd half) ────────────
 	const toVoid = db.prepare(`
 		SELECT * FROM matches
 		WHERE ${baseOk}
-		AND voided = 0
-		AND notified_ht = 1          -- only care about bets that reached HT
+		AND notified_ht = 1
 		AND event_status = '2nd half'
-		AND CAST(SUBSTR(match_time, 1, INSTR(match_time, ':') - 1) AS INTEGER) <= 55
-		AND set2_score IS NOT NULL
-		AND set2_score != ''
-		AND set2_score != '0:0'
-		AND set2_score != '-:-'
+		AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 55
+		AND set2_score IS NOT NULL AND set2_score != '' AND set2_score != '0:0' AND set2_score != '-:-'
 	`).all();
 
 	for (const bet of toVoid) {
@@ -405,52 +520,55 @@ async function poll() {
 		const min = getMin(bet.match_time);
 		await sendPush({
 			title:    `❌ Pro Bet Voided — ${min}'`,
-			body:     `Goal scored! ${bet.home_team} ${sc} ${bet.away_team}\n${bet.competition}`,
-			url:      '/probets.html',
+			body:     `Goal scored! ${bet.home_team} ${sc} ${bet.away_team} — ${bet.competition}`,
+			url:      '/',
 			match_id: bet.match_id,
 			stage:    'void',
 		});
 	}
 	if (toVoid.length) console.log(`[push-void] ${toVoid.length} bet(s) voided`);
 
-	// ── STAGE 3: 55-min alert ─────────────────────────────────────────────
-	// Fires once when match is 55'–90', not voided, criteria still met
-	const bet55Alerts = db.prepare(`
+	// ── STAGE 3: GREEN PRO BET alert ─────────────────────────────────────
+	// Fires the moment a match becomes a green pro bet:
+	// 2nd half >= 55', tracked from start, no early goal, not voided.
+	// notified_55 = 0 ensures it fires exactly once.
+	const greenAlerts = db.prepare(`
 		SELECT * FROM matches
 		WHERE ${baseOk}
 		AND event_status = '2nd half'
-		AND CAST(SUBSTR(match_time, 1, INSTR(match_time, ':') - 1) AS INTEGER) BETWEEN 55 AND 90
-		AND notified_ht = 1          -- must have already sent HT alert
-		AND voided = 0               -- not voided by early 2H goal
+		AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) >= 55
 		AND notified_55 = 0
 	`).all();
 
-	for (const bet of bet55Alerts) {
+	for (const bet of greenAlerts) {
 		db.prepare('UPDATE matches SET notified_55 = 1, notified = 1 WHERE match_id = ?').run(bet.match_id);
-		const sc  = (bet.current_score || '').replace(':', ' - ') || 'vs';
+		const sc  = (bet.current_score || '').replace(':', ' - ') || '0 - 0';
 		const min = getMin(bet.match_time);
 		await sendPush({
-			title:    `🎯 Pro Bet at ${min}'`,
-			body:     `${bet.home_team} ${sc} ${bet.away_team}\n${bet.competition}`,
-			url:      '/probets.html',
+			title:    `🟢 Pro Bet — ${min}' No Goal!`,
+			body:     `${bet.home_team}  ${sc}  ${bet.away_team}\n${bet.competition}`,
+			url:      '/',
 			match_id: bet.match_id,
-			stage:    '55',
+			stage:    'probet',
 		});
+		console.log(`[push-green] ${bet.home_team} vs ${bet.away_team} @ ${min}'`);
 	}
-	if (bet55Alerts.length) console.log(`[push-55] ${bet55Alerts.length} 55-min alert(s)`);
+	if (greenAlerts.length) console.log(`[push-green] ${greenAlerts.length} green pro bet alert(s)`);
 
 	// ── Delete completed matches ──────────────────────────────────────────
-	// Remove any match where ended_at was set (fully processed and gone)
-	const deleted = db.prepare(`
-		DELETE FROM matches WHERE ended_at IS NOT NULL
-		AND (julianday('now') - julianday(ended_at)) * 86400 > 300
-	`).run();
+	// Remove any match with ended_at set (processed and gone from live feed)
+	const endedRows = db.prepare(`SELECT match_id FROM matches WHERE ended_at IS NOT NULL`).all();
+	for (const row of endedRows) {
+		db.prepare('DELETE FROM match_events WHERE match_id = ?').run(row.match_id);
+		stmtDelete.run(row.match_id);
+		snapshots.delete(row.match_id);
+	}
 
 	console.log(
 		`[poll] ${new Date().toLocaleTimeString()} ` +
-		`live=${matches.filter(m => !isVirtual(m)).length} ` +
-		`ht=${htAlerts.length} void=${toVoid.length} 55min=${bet55Alerts.length} ` +
-		`deleted=${deleted.changes}`
+		`live=${matches.filter(m => isSoccer(m) && !isVirtual(m)).length} ` +
+		`ht=${htAlerts.length} void=${toVoid.length} green=${greenAlerts.length} ` +
+		`deleted=${endedRows.length}`
 	);
 }
 
@@ -508,9 +626,8 @@ app.post('/api/track-now', async (_req, res) => {
 		const reds    = (m.home_red_card    || 0) + (m.away_red_card    || 0);
 
 		const first_goal_min = goals > 0 ? min : null;
-		const max_yellow     = yellows;
 		const had_red        = reds > 0 ? 1 : 0;
-		const disqualified   = (reds > 0 || yellows >= 3) ? 1 : 0;
+		const disqualified   = reds > 0 ? 1 : 0;
 
 		stmtUpsert.run({
 			match_id:           m.match_id,
@@ -539,7 +656,6 @@ app.post('/api/track-now', async (_req, res) => {
 			neutral_odd:        m.neutral_odd       || '',
 			tracked_from_start: 1,
 			first_goal_min,
-			max_yellow,
 			had_red,
 			disqualified,
 			updated_at: now,
@@ -556,7 +672,7 @@ app.get('/api/live-soccer', async (_req, res) => {
 	try {
 		const matches = await fetchLiveSoccer();
 		// Filter out virtual for the live page too
-		res.json({ ok: true, matches: matches.filter(m => !isVirtual(m)), fetched_at: new Date().toISOString() });
+		res.json({ ok: true, matches: matches.filter(m => isSoccer(m) && !isVirtual(m)), fetched_at: new Date().toISOString() });
 	} catch (err) {
 		res.status(502).json({ ok: false, error: err.message });
 	}
@@ -565,8 +681,24 @@ app.get('/api/live-soccer', async (_req, res) => {
 app.get('/api/pro-bets', (_req, res) => {
 	try {
 		const probets = getProBets();
-		const total   = db.prepare('SELECT COUNT(*) as c FROM matches WHERE kicked_off_at IS NOT NULL AND is_virtual = 0').get().c;
+		// Attach goal events to each match
+		const stmtGoals = db.prepare(
+			"SELECT match_time, detail FROM match_events WHERE match_id = ? AND event_type = 'goal' ORDER BY recorded_at ASC"
+		);
+		probets.forEach(m => { m.goals = stmtGoals.all(m.match_id); });
+		const total = db.prepare('SELECT COUNT(*) as c FROM matches WHERE kicked_off_at IS NOT NULL AND is_virtual = 0').get().c;
 		res.json({ ok: true, matches: probets, total, fetched_at: new Date().toISOString() });
+	} catch (err) {
+		res.status(500).json({ ok: false, error: err.message });
+	}
+});
+
+app.get('/api/match-events/:match_id', (req, res) => {
+	try {
+		const events = db.prepare(
+			'SELECT * FROM match_events WHERE match_id = ? ORDER BY recorded_at ASC'
+		).all(req.params.match_id);
+		res.json({ ok: true, events });
 	} catch (err) {
 		res.status(500).json({ ok: false, error: err.message });
 	}
@@ -576,7 +708,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Start ─────────────────────────────────────────────────────────────────
 poll();
-setInterval(poll, 30_000);
+setInterval(poll, 15_000);
 
 app.listen(PORT, () => {
 	console.log(`\n  ⚽  Betika Live Soccer  →  http://localhost:${PORT}`);
