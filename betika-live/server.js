@@ -50,7 +50,8 @@ db.exec(`
 
     -- derived tracking (set once, never overwritten)
     tracked_from_start INTEGER DEFAULT 0, -- 1 = we saw this game from min 0-10
-    first_goal_min  INTEGER,              -- minute goals first went >0 (NULL = no goal yet)
+    first_goal_min  INTEGER,              -- minute goals first went >0 in 1st half (NULL = no goal yet)
+    second_half_goal_min INTEGER,         -- minute first goal scored in 2nd half (NULL = none yet)
     had_red         INTEGER DEFAULT 0,    -- 1 = red card seen at any point
     disqualified    INTEGER DEFAULT 0,    -- 1 = red card ever seen
 
@@ -90,6 +91,7 @@ db.exec(`
 	add('ended_at',            'TEXT');
 	add('tracked_from_start',  'INTEGER DEFAULT 0');
 	add('first_goal_min',      'INTEGER');
+	add('second_half_goal_min','INTEGER');
 	add('had_red',             'INTEGER DEFAULT 0');
 	add('disqualified',        'INTEGER DEFAULT 0');
 	add('notified',            'INTEGER DEFAULT 0');
@@ -113,7 +115,7 @@ const stmtUpsert = db.prepare(`
     event_status, match_time, current_score, ht_score, set1_score, set2_score,
     home_yellow, away_yellow, home_red, away_red, home_corners, away_corners,
     home_odd, away_odd, neutral_odd,
-    tracked_from_start, first_goal_min, had_red, disqualified,
+    tracked_from_start, first_goal_min, second_half_goal_min, had_red, disqualified,
     notified, notified_ht, notified_55, voided,
     updated_at
   ) VALUES (
@@ -122,33 +124,34 @@ const stmtUpsert = db.prepare(`
     @event_status, @match_time, @current_score, @ht_score, @set1_score, @set2_score,
     @home_yellow, @away_yellow, @home_red, @away_red, @home_corners, @away_corners,
     @home_odd, @away_odd, @neutral_odd,
-    @tracked_from_start, @first_goal_min, @had_red, @disqualified,
+    @tracked_from_start, @first_goal_min, @second_half_goal_min, @had_red, @disqualified,
     0, 0, 0, 0,
     @updated_at
   )
   ON CONFLICT(match_id) DO UPDATE SET
-    event_status        = excluded.event_status,
-    match_time          = excluded.match_time,
-    current_score       = excluded.current_score,
-    ht_score            = excluded.ht_score,
-    set1_score          = excluded.set1_score,
-    set2_score          = excluded.set2_score,
-    home_yellow         = excluded.home_yellow,
-    away_yellow         = excluded.away_yellow,
-    home_red            = excluded.home_red,
-    away_red            = excluded.away_red,
-    home_corners        = excluded.home_corners,
-    away_corners        = excluded.away_corners,
-    home_odd            = excluded.home_odd,
-    away_odd            = excluded.away_odd,
-    neutral_odd         = excluded.neutral_odd,
-    kicked_off_at       = COALESCE(matches.kicked_off_at,  excluded.kicked_off_at),
-    ended_at            = COALESCE(matches.ended_at,       excluded.ended_at),
-    tracked_from_start  = CASE WHEN matches.tracked_from_start = 1 THEN 1 ELSE excluded.tracked_from_start END,
-    first_goal_min      = COALESCE(matches.first_goal_min, excluded.first_goal_min),
-    had_red             = CASE WHEN matches.had_red = 1 THEN 1 ELSE excluded.had_red END,
-    disqualified        = CASE WHEN matches.disqualified = 1 THEN 1 ELSE excluded.disqualified END,
-    updated_at          = excluded.updated_at;
+    event_status          = excluded.event_status,
+    match_time            = excluded.match_time,
+    current_score         = excluded.current_score,
+    ht_score              = excluded.ht_score,
+    set1_score            = excluded.set1_score,
+    set2_score            = excluded.set2_score,
+    home_yellow           = excluded.home_yellow,
+    away_yellow           = excluded.away_yellow,
+    home_red              = excluded.home_red,
+    away_red              = excluded.away_red,
+    home_corners          = excluded.home_corners,
+    away_corners          = excluded.away_corners,
+    home_odd              = excluded.home_odd,
+    away_odd              = excluded.away_odd,
+    neutral_odd           = excluded.neutral_odd,
+    kicked_off_at         = COALESCE(matches.kicked_off_at,  excluded.kicked_off_at),
+    ended_at              = COALESCE(matches.ended_at,       excluded.ended_at),
+    tracked_from_start    = CASE WHEN matches.tracked_from_start = 1 THEN 1 ELSE excluded.tracked_from_start END,
+    first_goal_min        = COALESCE(matches.first_goal_min, excluded.first_goal_min),
+    second_half_goal_min  = COALESCE(matches.second_half_goal_min, excluded.second_half_goal_min),
+    had_red               = CASE WHEN matches.had_red = 1 THEN 1 ELSE excluded.had_red END,
+    disqualified          = CASE WHEN matches.disqualified = 1 THEN 1 ELSE excluded.disqualified END,
+    updated_at            = excluded.updated_at;
 `);
 
 const stmtInsertEvent = db.prepare(`
@@ -267,6 +270,7 @@ async function sendPush(payload) {
 function getProBets() {
 	return db.prepare(`
 		SELECT *,
+		  (SELECT COUNT(*) FROM match_events WHERE match_events.match_id = matches.match_id AND event_type='goal') as total_goals,
 		  CASE
 		    WHEN event_status = '1st half'
 		         AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 10
@@ -286,35 +290,24 @@ function getProBets() {
 			is_virtual = 0
 			AND disqualified = 0
 			AND voided = 0
+			-- no goal in first 15 mins of 1st half
+			AND (first_goal_min IS NULL OR first_goal_min > 15)
+			-- no goal in first 15 mins of 2nd half (45+15=60)
+			AND (second_half_goal_min IS NULL OR second_half_goal_min > 60)
+			-- total goals < 3
+			AND (SELECT COUNT(*) FROM match_events WHERE match_events.match_id = matches.match_id AND event_type='goal') < 3
 			AND (
-			  -- Being tracked: 1st half, within first 10 minutes (show immediately, no tracked_from_start needed)
-			  (
-			    event_status = '1st half'
-			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 10
-			  )
+			  -- Being tracked: 1st half within first 10 mins
+			  (event_status = '1st half' AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) <= 10)
 			  OR
-			  -- Watching: 1st half past 10', tracked from start, no early goal
-			  (
-			    event_status = '1st half'
-			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) > 10
-			    AND tracked_from_start = 1
-			    AND (first_goal_min IS NULL OR first_goal_min > 15)
-			  )
+			  -- Watching: 1st half past 10', tracked from start
+			  (event_status = '1st half' AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) > 10 AND tracked_from_start = 1)
 			  OR
-			  -- Watching: half time, tracked, no early goal
-			  (
-			    event_status = 'half time'
-			    AND tracked_from_start = 1
-			    AND (first_goal_min IS NULL OR first_goal_min > 15)
-			  )
+			  -- Watching: half time, tracked
+			  (event_status = 'half time' AND tracked_from_start = 1)
 			  OR
-			  -- Perfect pro bet: 2nd half >=55', tracked, no early goal
-			  (
-			    event_status = '2nd half'
-			    AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) >= 55
-			    AND tracked_from_start = 1
-			    AND (first_goal_min IS NULL OR first_goal_min > 15)
-			  )
+			  -- Pro bet: 2nd half >= 55', tracked
+			  (event_status = '2nd half' AND CAST(SUBSTR(match_time, 1, INSTR(match_time||':', ':') - 1) AS INTEGER) >= 55 AND tracked_from_start = 1)
 			)
 		ORDER BY
 			CASE
@@ -383,9 +376,17 @@ async function poll() {
 		const seenEarly = status === '1st half' && min <= 10;
 		const trackedFromStart = existing?.tracked_from_start === 1 ? 1 : (seenEarly ? 1 : 0);
 
-		// ── first_goal_min: minute we first observed goals > 0 ───────────
+		// ── first_goal_min: minute we first observed goals > 0 in 1st half ─
 		let first_goal_min = existing?.first_goal_min ?? null;
-		if (first_goal_min === null && goals > 0) first_goal_min = min;
+		if (first_goal_min === null && goals > 0 && status === '1st half') first_goal_min = min;
+
+		// ── second_half_goal_min: first goal minute in 2nd half ───────────
+		let second_half_goal_min = existing?.second_half_goal_min ?? null;
+		if (second_half_goal_min === null && goals > 0 && status === '2nd half') {
+			// Calculate 2nd half goals from set2_score
+			const h2goals = parseGoals(m.set_score?.[1]?.score || m.set2_score || '');
+			if (h2goals > 0) second_half_goal_min = min;
+		}
 
 		// ── had_red / disqualified: sticky flags — only red cards now ────────
 		const had_red      = (existing?.had_red === 1 || reds > 0) ? 1 : 0;
@@ -400,7 +401,6 @@ async function poll() {
 			const prevGoals = parseGoals(prev.score);
 			const currGoals = parseGoals(score);
 			if (currGoals > prevGoals) {
-				// Determine which team scored by comparing sides
 				const [ph, pa] = (prev.score || '0:0').split(':').map(Number);
 				const [ch, ca] = (score || '0:0').split(':').map(Number);
 				let detail = '';
@@ -408,13 +408,13 @@ async function poll() {
 				else if (ca > pa) detail = `${m.away_team} scored`;
 				else detail = 'Goal';
 				stmtInsertEvent.run({
-					match_id:    m.match_id,
-					event_type:  'goal',
-					match_time:  m.match_time || '',
+					match_id:     m.match_id,
+					event_type:   'goal',
+					match_time:   m.match_time || '',
 					score_before: prev.score,
 					score_after:  score,
-					detail,
-					recorded_at: now,
+					detail:       `${detail} (${score.replace(':', '-')})`,
+					recorded_at:  now,
 				});
 			}
 			if (snap.home_red > prev.home_red) {
@@ -442,32 +442,33 @@ async function poll() {
 		}
 
 		stmtUpsert.run({
-			match_id:          m.match_id,
-			home_team:         m.home_team,
-			away_team:         m.away_team,
-			competition:       m.competition_name || '',
-			category:          m.category         || '',
-			start_time:        m.start_time        || '',
-			is_virtual:        0,
-			kicked_off_at:     kickedOffAt,
-			ended_at:          endedAt,
-			event_status:      status,
-			match_time:        m.match_time        || '',
-			current_score:     score,
-			ht_score:          m.ht_score          || '',
-			set1_score:        m.set_score?.[0]?.score || '',
-			set2_score:        m.set_score?.[1]?.score || '',
-			home_yellow:       m.home_yellow_card   || 0,
-			away_yellow:       m.away_yellow_card   || 0,
-			home_red:          m.home_red_card      || 0,
-			away_red:          m.away_red_card      || 0,
-			home_corners:      m.home_corners       || 0,
-			away_corners:      m.away_corners       || 0,
-			home_odd:          m.home_odd           || '',
-			away_odd:          m.away_odd           || '',
-			neutral_odd:       m.neutral_odd        || '',
-			tracked_from_start: trackedFromStart,
+			match_id:             m.match_id,
+			home_team:            m.home_team,
+			away_team:            m.away_team,
+			competition:          m.competition_name || '',
+			category:             m.category         || '',
+			start_time:           m.start_time        || '',
+			is_virtual:           0,
+			kicked_off_at:        kickedOffAt,
+			ended_at:             endedAt,
+			event_status:         status,
+			match_time:           m.match_time        || '',
+			current_score:        score,
+			ht_score:             m.ht_score          || '',
+			set1_score:           m.set_score?.[0]?.score || '',
+			set2_score:           m.set_score?.[1]?.score || '',
+			home_yellow:          m.home_yellow_card   || 0,
+			away_yellow:          m.away_yellow_card   || 0,
+			home_red:             m.home_red_card      || 0,
+			away_red:             m.away_red_card      || 0,
+			home_corners:         m.home_corners       || 0,
+			away_corners:         m.away_corners       || 0,
+			home_odd:             m.home_odd           || '',
+			away_odd:             m.away_odd           || '',
+			neutral_odd:          m.neutral_odd        || '',
+			tracked_from_start:   trackedFromStart,
 			first_goal_min,
+			second_half_goal_min,
 			had_red,
 			disqualified,
 			updated_at: now,
@@ -475,12 +476,21 @@ async function poll() {
 	}
 
 	// ── Base criteria check (shared across all stages) ──────────────────
+	// New criteria:
+	//   - No goal in first 15 mins of 1st half
+	//   - No goal in first 15 mins of 2nd half
+	//   - Total goals < 3
 	const baseOk = `
 		is_virtual = 0
 		AND tracked_from_start = 1
 		AND disqualified = 0
 		AND voided = 0
 		AND (first_goal_min IS NULL OR first_goal_min > 15)
+		AND (second_half_goal_min IS NULL OR second_half_goal_min > (45 + 15))
+		AND (
+		  SELECT COALESCE(SUM(CASE WHEN event_type='goal' THEN 1 ELSE 0 END), 0)
+		  FROM match_events WHERE match_events.match_id = matches.match_id
+		) < 3
 	`;
 
 	// ── STAGE 1: Half-time alert ──────────────────────────────────────────

@@ -262,7 +262,7 @@
     if (pb && pb.goals && pb.goals.length) {
       var goalItems = pb.goals.map(function(g) {
         var min = parseInt((g.match_time || '0').split(':')[0]) || 0;
-        return '<span class="goal-item">&#9917; ' + min + "' " + (g.detail || '') + '</span>';
+        return '<span class="goal-item">&#9917; ' + min + "' &mdash; " + (g.detail || '') + '</span>';
       }).join('');
       goalsHtml = '<div class="goals-row">' + goalItems + '</div>';
     }
